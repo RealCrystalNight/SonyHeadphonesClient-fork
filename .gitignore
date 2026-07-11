@@ -535,3 +535,5 @@ cmake-build*/
 # Visual Studio Generator files
 *.sln
 *.vcxproj
+Reference/
+Report.md

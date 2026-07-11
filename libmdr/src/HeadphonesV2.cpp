@@ -161,6 +161,16 @@ namespace mdr
         /* Equalizer */
         SendCommandACK(t1::EqEbbGetStatus, {.type = t1::EqEbbInquiredType::PRESET_EQ});
         SendCommandACK(t1::EqEbbGetParam);
+        if (mSupport.contains(MessageMdrV2FunctionType_Table1::PRESET_EQ_AND_ULT_MODE))
+            SendCommandACK(t1::EqEbbGetParam, {.base = {
+                .command = t1::Command::EQEBB_GET_PARAM,
+                .type = t1::EqEbbInquiredType::PRESET_EQ_AND_ULT_MODE
+            }});
+        if (mSupport.contains(MessageMdrV2FunctionType_Table1::SOUND_EFFECT))
+            SendCommandACK(t1::EqEbbGetParam, {.base = {
+                .command = t1::Command::EQEBB_GET_PARAM,
+                .type = t1::EqEbbInquiredType::SOUND_EFFECT
+            }});
 
         /* Connection Quality */
         if (mSupport.contains(
@@ -577,6 +587,35 @@ namespace mdr
                 SendCommandACK(EqEbbParamEq, res);
                 // Ask for a equalizer param update afterwards
                 SendCommandACK(EqEbbGetParam);
+            }
+        }
+
+        /* Sound Effect / ULT Mode */
+        if (mSupport.contains(MessageMdrV2FunctionType_Table1::SOUND_EFFECT))
+        {
+            if (mSoundEffect.dirty())
+            {
+                using namespace t1;
+                EqEbbParamSoundEffect res;
+                res.base.command = Command::EQEBB_SET_PARAM;
+                res.base.type = EqEbbInquiredType::SOUND_EFFECT;
+                res.soundEffectValue = mSoundEffect.desired;
+                SendCommandACK(EqEbbParamSoundEffect, res);
+                mSoundEffect.commit();
+            }
+        }
+        if (mSupport.contains(MessageMdrV2FunctionType_Table1::PRESET_EQ_AND_ULT_MODE))
+        {
+            if (mEqUltMode.dirty())
+            {
+                using namespace t1;
+                EqEbbParamEqAndUltMode res;
+                res.base.command = Command::EQEBB_SET_PARAM;
+                res.base.type = EqEbbInquiredType::PRESET_EQ_AND_ULT_MODE;
+                res.presetId = mEqPresetId.current;
+                res.eqUltModeStatus = mEqUltMode.desired;
+                SendCommandACK(EqEbbParamEqAndUltMode, res);
+                mEqUltMode.commit();
             }
         }
 

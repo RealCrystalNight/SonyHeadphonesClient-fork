@@ -695,6 +695,29 @@ namespace mdr
                 break;
             }
         }
+        case PRESET_EQ_AND_ULT_MODE:
+        {
+            if (self->mSupport.contains(MessageMdrV2FunctionType_Table1::PRESET_EQ_AND_ULT_MODE))
+            {
+                EqEbbParamEqAndUltMode res;
+                EqEbbParamEqAndUltMode::Deserialize(cmd.data(), res, cmd.size());
+                self->mEqPresetId.overwrite(res.presetId);
+                self->mEqUltMode.overwrite(res.eqUltModeStatus);
+                return MDR_HEADPHONES_EVT_EQUALIZER_PARAM;
+            }
+            return MDR_HEADPHONES_EVT_UNHANDLED;
+        }
+        case SOUND_EFFECT:
+        {
+            if (self->mSupport.contains(MessageMdrV2FunctionType_Table1::SOUND_EFFECT))
+            {
+                EqEbbParamSoundEffect res;
+                EqEbbParamSoundEffect::Deserialize(cmd.data(), res, cmd.size());
+                self->mSoundEffect.overwrite(res.soundEffectValue);
+                return MDR_HEADPHONES_EVT_EQUALIZER_PARAM;
+            }
+            return MDR_HEADPHONES_EVT_UNHANDLED;
+        }
         default:
             break;
         }

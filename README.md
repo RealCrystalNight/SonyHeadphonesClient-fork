@@ -89,4 +89,15 @@ while your device having proper AVRCP support (e.g. works on other platforms).
   is to manually run `mpris-proxy` (available in `bluez-tools`/`bluez-utils` package) in the background, or as a systemd service.
 - See also
   - https://wiki.archlinux.org/title/MPRIS
-  - https://github.com/bluez/bluez/issues/868 
+  - https://github.com/bluez/bluez/issues/868
+
+## New Features (this fork)
+
+- **ULT Power Sound / Sound Effect Mode** — Added full ULT mode control (OFF/ULT1/ULT2) and sound effect selection (OFF/ULT/ULT1/ULT2/CUSTOM) for ULT series devices like WH-ULT900N "ULT WEAR", extracted from the official Sony Headphones Connect app via APK decompilation.
+- **Device Photo Display** — Automatically fetches and displays product images from Sony's GraphQL API (`v1.api.data-gateway.seeds.services/graphql`), using an API key extracted from `libcloudmodelinfo.so` via Ghidra/static analysis. Falls back to bundled default images from the official app.
+- **Device Image Database** — Local cache of ~300+ Sony device model entries with CDN-hosted product photos, sourced from decompiling the official Sony Headphones Connect APK (v13.0.5).
+- **Missing Protocol Features** — Implemented handler code for `SOUND_EFFECT`, `PRESET_EQ_AND_ULT_MODE` (ULT mode), and added missing enum values (`ULT_SOUND_EFFECT_ASSIGN`, `CUSTOMIZABLE_SOUND_EFFECT`, `SOUND_EFFECT_FLAT`, `SOUND_EFFECT_LIVE`, etc.) derived from decompiling the official app. See `Report.md` for a full gap analysis.
+
+## Acknowledgements
+
+This project is a fork of the excellent work by [mos9527](https://github.com/mos9527/SonyHeadphonesClient), which itself is a rewrite of the original [SonyHeadphonesClient by Plutoberth](https://github.com/Plutoberth/SonyHeadphonesClient). Many protocol definitions, feature discoveries, and the device image database are derived from decompiling the official Sony Headphones Connect APK (v13.0.5) using jadx, with additional native library analysis via Ghidra. 

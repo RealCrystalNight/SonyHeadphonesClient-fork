@@ -23,6 +23,8 @@ target_sources(
         PRIVATE
         SDLMain.cpp
         Client.cpp
+        ImageLoader.cpp
+        ModelImageDB.hpp
         Fonts/PlexSansIcon.c
 )
 set(SDL_AUDIO OFF CACHE BOOL "" FORCE)
@@ -64,9 +66,12 @@ add_subdirectory(Platform)
 target_link_libraries(ImGuiSDL3 PUBLIC SDL3::SDL3-static)
 target_link_libraries(SonyHeadphonesClient PRIVATE mdr ImGuiSDL3 Client_Platform)
 
+target_include_directories(SonyHeadphonesClient PRIVATE ${CMAKE_SOURCE_DIR}/contrib)
+
 target_compile_definitions(SonyHeadphonesClient PRIVATE
     -DCLIENT_VERSION="${CLIENT_VERSION}"
     -DMDR_GIT_COMMIT_HASH="${MDR_GIT_COMMIT_HASH}"
     -DMDR_GIT_BRANCH_NAME="${MDR_GIT_BRANCH_NAME}"
     -DMDR_PLATFORM_OS="${MDR_PLATFORM_OS}"
+    -DCLIENT_RESOURCES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources"
 )

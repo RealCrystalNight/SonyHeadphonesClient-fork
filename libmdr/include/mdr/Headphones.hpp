@@ -348,6 +348,8 @@ namespace mdr
         MDRProperty<int> mEqClearBass;
         // Non-zero band count of either 5: [400,1k,2.5k,6.3k,16k] or 10: [31,63,125,250,500,1k,2k,4k,8k,16k]
         MDRProperty<Vector<int>> mEqConfig;
+        MDRProperty<v2::t1::EqUltMode> mEqUltMode;
+        MDRProperty<v2::t1::SoundEffectType> mSoundEffect;
 
         MDRProperty<bool> mVoiceGuidanceEnabled;
         // Volume range [-2,2]

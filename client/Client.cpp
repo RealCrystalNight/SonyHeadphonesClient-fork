@@ -11,7 +11,13 @@
 #include "Fonts/PlexSansIcon.h"
 #include "Platform/Platform.hpp"
 #include "MaterialYouTheme.hpp"
+#include "ImageLoader.hpp"
+#include "ModelImageDB.hpp"
 using namespace mdr;
+
+extern SDL_Renderer* gRenderer;
+static DeviceImage gDeviceImage;
+static ModelImageDB gModelDB;
 
 mdr::MDRHeadphones gDevice;
 String gBugcheckMessage;
@@ -251,6 +257,42 @@ const char* FormatEnum(v2::t1::Function function)
         return "Unknown";
     }
 }
+const char* FormatEnum(v2::t1::SoundEffectType se)
+{
+    using enum v2::t1::SoundEffectType;
+    switch (se)
+    {
+    case SOUND_EFFECT_OFF:
+        return "Off";
+    case SOUND_EFFECT_ULT:
+        return "ULT";
+    case SOUND_EFFECT_ULT1:
+        return "ULT 1";
+    case SOUND_EFFECT_ULT2:
+        return "ULT 2";
+    case SOUND_EFFECT_CUSTOM:
+        return "Custom";
+    default:
+        return "Unknown";
+    }
+}
+
+const char* FormatEnum(v2::t1::EqUltMode mode)
+{
+    using enum v2::t1::EqUltMode;
+    switch (mode)
+    {
+    case OFF:
+        return "Off";
+    case ULT_1:
+        return "ULT 1";
+    case ULT_2:
+        return "ULT 2";
+    default:
+        return "Unknown";
+    }
+}
+
 const char* FormatEnum(v2::t1::AutoPowerOffElements off)
 {
     using enum v2::t1::AutoPowerOffElements;
@@ -505,6 +547,32 @@ enum
     CONN_STATE_CONNECTED,
     CONN_STATE_DISCONNECTED
 } connState{CONN_STATE_NO_CONNECTION};
+static void LoadDeviceImage()
+{
+    gDeviceImage = {};
+    std::string path = CLIENT_RESOURCES_DIR;
+    std::string modelName = gDevice.mModelName;
+
+    // Build safe filename (replace non-alphanumeric chars)
+    auto safeName = [](std::string s) {
+        for (auto& c : s)
+            if (!std::isalnum(c)) c = '_';
+        return s;
+    };
+
+    // Check for cached per-model image
+    std::string cachePath = path + "/device_" + safeName(modelName) + ".png";
+    auto img = LoadPNG(gRenderer, cachePath);
+    if (img)
+    {
+        gDeviceImage = std::move(img);
+        return;
+    }
+
+    // Fall back to generic default
+    img = LoadPNG(gRenderer, path + "/device_default.png");
+    if (img) gDeviceImage = std::move(img);
+}
 #pragma endregion
 
 void ExceptionHandler(auto&& func)
@@ -734,6 +802,16 @@ void DrawDeviceControlsHeader()
         }
         ImGui::PopFont();
         ImGui::EndMenuBar();
+    }
+    // Device Image
+    if (gDeviceImage)
+    {
+        float maxH = 160.0f;
+        float aspect = (float)gDeviceImage.width / gDeviceImage.height;
+        float w = maxH * aspect, h = maxH;
+        if (w > 400.0f) { w = 400.0f; h = w / aspect; }
+        ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - w) * 0.5f);
+        ImGui::Image((ImTextureID)(intptr_t)gDeviceImage.texture, ImVec2(w, h));
     }
     // Stats
     if (ImGui::BeginTable("##Stats", 2, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_Resizable))
@@ -1028,6 +1106,30 @@ void DrawDeviceControlsSound()
         if (ImGui::RadioButton("On (Auto)", gDevice.mUpscalingEnabled.desired == true))
             gDevice.mUpscalingEnabled.desired = true;
         ImGui::EndDisabled();
+        if (kSupports(F1::SOUND_EFFECT))
+        {
+            ImGui::SeparatorText("Sound Effect");
+            using namespace v2::t1;
+            constexpr SoundEffectType kSe[] = {
+                SoundEffectType::SOUND_EFFECT_OFF,
+                SoundEffectType::SOUND_EFFECT_ULT,
+                SoundEffectType::SOUND_EFFECT_ULT1,
+                SoundEffectType::SOUND_EFFECT_ULT2,
+                SoundEffectType::SOUND_EFFECT_CUSTOM,
+            };
+            ImComboBoxItems<SoundEffectType>("Type", kSe, gDevice.mSoundEffect.desired);
+        }
+        if (kSupports(F1::PRESET_EQ_AND_ULT_MODE))
+        {
+            ImGui::SeparatorText("ULT Mode");
+            using namespace v2::t1;
+            constexpr EqUltMode kU[] = {
+                EqUltMode::OFF,
+                EqUltMode::ULT_1,
+                EqUltMode::ULT_2,
+            };
+            ImComboBoxItems<EqUltMode>("Mode", kU, gDevice.mEqUltMode.desired);
+        }
         ImGui::TreePop();
     }
 }
@@ -1375,6 +1477,8 @@ void DrawDeviceControls()
         switch (event)
         {
         case MDR_HEADPHONES_TASK_INIT_OK:
+            // Load model image database
+            gModelDB.load(std::string(CLIENT_RESOURCES_DIR) + "/model_images.json");
             // Request for a stat update ASAP
             // User may request for this themselves - we don't do periodic checks this time
             MDR_CHECK(gDevice.Invoke(gDevice.RequestSyncV2()) == MDR_RESULT_OK);
@@ -1392,6 +1496,7 @@ void DrawDeviceControls()
             // Dynamic theme for the headphone's own colors
             // Contributed by @salmon-21 in https://github.com/mos9527/SonyHeadphonesClient/pull/41
             MaterialYouTheme::ApplyForModelColor(static_cast<uint8_t>(gDevice.mModelColor));
+            LoadDeviceImage();
         case MDR_HEADPHONES_INPROGRESS:
         default:
             break;

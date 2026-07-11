@@ -301,6 +301,13 @@ namespace mdr::v2::t1
         CUSTOM_EQ = 0x31,
         // PARAM: [ SN] EqEbbParamTurnKeyEq
         TURN_KEY_EQ = 0x32,
+        // PARAM: [   ] None
+        CUSTOMIZABLE_SOUND_EFFECT_SELECT = 0x33,
+        CUSTOMIZABLE_SOUND_EFFECT_RESET = 0x34,
+        CUSTOMIZABLE_SOUND_EFFECT_CUSTOM = 0x35,
+        CUSTOMIZABLE_SOUND_EFFECT_EXTERNAL_UPDATE = 0x36,
+        // PARAM: [ S ] EqEbbParamUltBtnSoundEffectAssign
+        ULT_BTN_SOUND_EFFECT_ASSIGN = 0x40,
     };
 
     enum class EqPresetId : UInt8
@@ -380,6 +387,8 @@ namespace mdr::v2::t1
         SOUND_EFFECT_ULT1 = 0x02,
         SOUND_EFFECT_ULT2 = 0x03,
         SOUND_EFFECT_CUSTOM = 0x04,
+        SOUND_EFFECT_FLAT = 0x05,
+        SOUND_EFFECT_LIVE = 0x06,
         SOUND_EFFECT_NONE = 0xFF,
     };
 

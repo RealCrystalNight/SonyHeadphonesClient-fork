@@ -313,6 +313,11 @@ namespace mdr::v2::t1 {
             case SOUND_EFFECT: return "SOUND_EFFECT";
             case CUSTOM_EQ: return "CUSTOM_EQ";
             case TURN_KEY_EQ: return "TURN_KEY_EQ";
+            case CUSTOMIZABLE_SOUND_EFFECT_SELECT: return "CUSTOMIZABLE_SOUND_EFFECT_SELECT";
+            case CUSTOMIZABLE_SOUND_EFFECT_RESET: return "CUSTOMIZABLE_SOUND_EFFECT_RESET";
+            case CUSTOMIZABLE_SOUND_EFFECT_CUSTOM: return "CUSTOMIZABLE_SOUND_EFFECT_CUSTOM";
+            case CUSTOMIZABLE_SOUND_EFFECT_EXTERNAL_UPDATE: return "CUSTOMIZABLE_SOUND_EFFECT_EXTERNAL_UPDATE";
+            case ULT_BTN_SOUND_EFFECT_ASSIGN: return "ULT_BTN_SOUND_EFFECT_ASSIGN";
             default: return "Unknown";
         }
     }
@@ -398,6 +403,8 @@ namespace mdr::v2::t1 {
             case SOUND_EFFECT_ULT1: return "SOUND_EFFECT_ULT1";
             case SOUND_EFFECT_ULT2: return "SOUND_EFFECT_ULT2";
             case SOUND_EFFECT_CUSTOM: return "SOUND_EFFECT_CUSTOM";
+            case SOUND_EFFECT_FLAT: return "SOUND_EFFECT_FLAT";
+            case SOUND_EFFECT_LIVE: return "SOUND_EFFECT_LIVE";
             case SOUND_EFFECT_NONE: return "SOUND_EFFECT_NONE";
             default: return "Unknown";
         }
@@ -1490,6 +1497,11 @@ namespace mdr::v2::t1 {
             case SOUND_EFFECT:
             case CUSTOM_EQ:
             case TURN_KEY_EQ:
+            case CUSTOMIZABLE_SOUND_EFFECT_SELECT:
+            case CUSTOMIZABLE_SOUND_EFFECT_RESET:
+            case CUSTOMIZABLE_SOUND_EFFECT_CUSTOM:
+            case CUSTOMIZABLE_SOUND_EFFECT_EXTERNAL_UPDATE:
+            case ULT_BTN_SOUND_EFFECT_ASSIGN:
             return true;
         default: return false;
         }
@@ -1578,6 +1590,8 @@ namespace mdr::v2::t1 {
             case SOUND_EFFECT_ULT1:
             case SOUND_EFFECT_ULT2:
             case SOUND_EFFECT_CUSTOM:
+            case SOUND_EFFECT_FLAT:
+            case SOUND_EFFECT_LIVE:
             case SOUND_EFFECT_NONE:
             return true;
         default: return false;

@@ -142,3 +142,19 @@ emit corresponding code with proper nesting and indentation.
 - `MDR_DEFINE_EXTERN_READ_WRITE(SubType)` for non-trivially serializable fields structs declaration, where codegen will generate implementations.
   - `MDR_CODEGEN_IGNORE_SERIALIZATION` to exclude a field struct from codegen serialization impl generation, and implement manually.
   - `MDR_CODEGEN_IGNORE_VALIDATION` to exclude a struct from codegen validation.
+
+# Device Image API
+Sony's GraphQL API for device model images:
+- **Endpoint**: `https://v1.api.data-gateway.seeds.services/graphql`
+- **API Key**: `37ksfjEuDRYXYtgus4rEDw6QC2NqhTfr`
+- **Query**: `query GetAllCloudModelInfos { HPC { getAllCloudModelInfos { model_id model_number model_name model_color_id sca_image_image_url } } }`
+- **Key source**: `libcloudmodelinfo.so` from APK `split_config.arm64_v8a.apk` (`/tmp/apkm-extract/`)
+- **Cached DB**: `client/Resources/model_images.json`
+- **Image CDN**: `https://hpc-image.data-gateway.seeds.services/{uuid}.png`
+
+# Decompilation Tools
+- **Jadx**: `/tmp/jadx/bin/jadx` (also copied to Zyvori Decompilers directory)
+- **Ghidra (Flatpak)**: `/var/lib/flatpak/app/org.ghidra_sre.Ghidra/x86_64/stable/<hash>/files/lib/ghidra`
+- **GHIDRA_INSTALL_DIR**: Set in `~/.bashrc` for Detranspiler
+- **Detranspiler**: `/home/zoroaster/Downloads/Detranspiler/` (pip install -e . required)
+- **APK source**: `/tmp/apkm-extract/split_config.*.apk` from APKMirror
