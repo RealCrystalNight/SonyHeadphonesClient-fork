@@ -1,12 +1,11 @@
-SonyHeadphonesClient
+SonyHeadphonesClient 
 ===
 
-A spiritual successor to  [Plutoberth's original SonyHeadphonesClient](https://github.com/Plutoberth/SonyHeadphonesClient) - now with standardized support for newer devices and more platforms.
+A spiritual successor to  [Plutoberth's original SonyHeadphonesClient](https://github.com/Plutoberth/SonyHeadphonesClient) - now with standardized support for newer devices and more platforms. (Forked from https://github.com/mos9527/SonyHeadphonesClient)
 
-There's no release build yet - but you can always grab the latest [nightly builds](https://nightly.link/mos9527/SonyHeadphonesClient/workflows/cmake/rewrite?preview), or use the [Web Version](#notes-on-web-platform).
 
-[![Build](https://github.com/mos9527/sonyheadphonesclient/actions/workflows/cmake.yml/badge.svg)](https://github.com/mos9527/SonyHeadphonesClient/actions/workflows/cmake.yml) 
-[![Nightly Builds](https://img.shields.io/badge/rewrite-builds-cyan)](https://nightly.link/mos9527/SonyHeadphonesClient/workflows/cmake/rewrite?preview)
+<img width="1066" height="942" alt="Screenshot_20260711_180848" src="https://github.com/user-attachments/assets/48959bb0-2e68-4192-adaf-d4957fc3fc20" />
+
 
 ## Roadmap
 This brach is expected to be merged/released once the following features have been implemented.
