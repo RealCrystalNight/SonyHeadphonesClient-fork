@@ -1113,7 +1113,10 @@ void DrawDeviceControlsSound()
             HEAVY, CLEAR, HARD, SOFT, GAMING_EQ, FPS_1, FPS_2, FPS_3,
             CUSTOM, USER_SETTING1, USER_SETTING2, USER_SETTING3, USER_SETTING4, USER_SETTING5
         };
+        auto ep_before = gDevice.mEqPresetId.desired;
         ImComboBoxItems<v2::t1::EqPresetId>("Preset", kSelections, gDevice.mEqPresetId.desired);
+        if (ep_before != gDevice.mEqPresetId.desired)
+            fprintf(stderr, "[EQ] preset changed: %d -> %d\n", (int)ep_before, (int)gDevice.mEqPresetId.desired);
         ImGui::Separator();
         DrawEqualizer(gDevice.mEqConfig.desired);
         bool eqChanged = gDevice.mEqConfig.dirty() || gDevice.mEqClearBass.dirty();
@@ -1130,6 +1133,18 @@ void DrawDeviceControlsSound()
         {
             ImGui::Text("%+d", gDevice.mEqConfig.current[i]);
             if (i < gDevice.mEqConfig.current.size() - 1) ImGui::SameLine();
+        }
+        // Force switch to editable preset when sliders are touched
+        if (gDevice.mEqConfig.dirty() || gDevice.mEqClearBass.dirty())
+        {
+            using enum v2::t1::EqPresetId;
+            auto id = gDevice.mEqPresetId.desired;
+            bool editable = (id == CUSTOM || (id >= USER_SETTING1 && id <= USER_SETTING5));
+            if (!editable)
+            {
+                fprintf(stderr, "[EQ] forcing preset CUSTOM\n");
+                gDevice.mEqPresetId.desired = CUSTOM;
+            }
         }
         ImGui::SeparatorText("DSEE");
         ImGui::BeginDisabled(!gDevice.mUpscalingAvailable);
@@ -1553,9 +1568,12 @@ void DrawDeviceControls()
             // Commit changes if needed to
             if (gDevice.IsDirty())
             {
+                fprintf(stderr, "[COMMIT] dirty: preset=%d eqCfg=%d clrBass=%d ult=%d snd=%d\n",
+                    gDevice.mEqPresetId.dirty(), gDevice.mEqConfig.dirty(),
+                    gDevice.mEqClearBass.dirty(), gDevice.mEqUltMode.dirty(),
+                    gDevice.mSoundEffect.dirty());
                 int r = gDevice.Invoke(gDevice.RequestCommitV2());
-                if (r != MDR_RESULT_OK && r != MDR_RESULT_INPROGRESS)
-                    fprintf(stderr, "Idle commit error: %d\n", r);
+                fprintf(stderr, "[COMMIT] Invoke returned %d\n", r);
             }
             // Periodic playback metadata poll (~5s)
             static Uint32 lastPlaybackPoll = 0;

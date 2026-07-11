@@ -666,10 +666,18 @@ namespace mdr
             EqEbbParamEq res;
             EqEbbParamEq::Deserialize(cmd.data(), res, cmd.size());
             self->mEqPresetId.overwrite(res.presetId);
+            //MDR_LOG("[EQ] PRESET_EQ response: presetId={} bands={}", (int)res.presetId, res.bands.size());
+            if (res.bands.size() > 0)
+            {
+                std::string hex;
+                for (auto b : res.bands.value)
+                    hex += fmt::format(" {:02x}", b);
+                //MDR_LOG("[EQ]  raw bands:{}", hex);
+            }
             switch (res.bands.size())
             {
             case 0:
-                // Keep existing bands if device returns none
+                //MDR_LOG("[EQ] 0 bands from device, keeping existing");
                 return MDR_HEADPHONES_EVT_EQUALIZER_PARAM;
             case 6:
                 self->mEqClearBass.overwrite(res.bands.value[0] - 10);
@@ -708,26 +716,28 @@ namespace mdr
                 EqEbbParamEqAndUltMode::Deserialize(cmd.data(), res, cmd.size());
                 self->mEqPresetId.overwrite(res.presetId);
                 self->mEqUltMode.overwrite(res.eqUltModeStatus);
-                // Extract band steps
                 auto bv = res.bandSteps.value;
-                if (bv.size() == 6) // Clear Bass + 5 bands
+                if (bv.size() > 0 && res.presetId == self->mEqPresetId.current)
                 {
-                    self->mEqClearBass.overwrite(static_cast<int>(bv[0]) - 10);
-                    self->mEqConfig.overwrite(Vector<int>{
-                        static_cast<int>(bv[1]) - 10,
-                        static_cast<int>(bv[2]) - 10,
-                        static_cast<int>(bv[3]) - 10,
-                        static_cast<int>(bv[4]) - 10,
-                        static_cast<int>(bv[5]) - 10,
-                    });
-                }
-                else if (bv.size() == 10) // 10 bands
-                {
-                    self->mEqClearBass.overwrite(0);
-                    Vector<int> bands;
-                    for (auto v : bv)
-                        bands.push_back(static_cast<int>(v) - 6);
-                    self->mEqConfig.overwrite(bands);
+                    if (bv.size() == 6)
+                    {
+                        self->mEqClearBass.overwrite(static_cast<int>(bv[0]) - 10);
+                        self->mEqConfig.overwrite({
+                            static_cast<int>(bv[1]) - 10,
+                            static_cast<int>(bv[2]) - 10,
+                            static_cast<int>(bv[3]) - 10,
+                            static_cast<int>(bv[4]) - 10,
+                            static_cast<int>(bv[5]) - 10,
+                        });
+                    }
+                    else if (bv.size() == 10)
+                    {
+                        self->mEqClearBass.overwrite(0);
+                        Vector<int> bands;
+                        for (auto v : bv)
+                            bands.push_back(static_cast<int>(v) - 6);
+                        self->mEqConfig.overwrite(bands);
+                    }
                 }
                 return MDR_HEADPHONES_EVT_EQUALIZER_PARAM;
             }

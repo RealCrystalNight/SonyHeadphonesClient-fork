@@ -535,8 +535,7 @@ namespace mdr
             bool ultSupported = mSupport.contains(MessageMdrV2FunctionType_Table1::PRESET_EQ_AND_ULT_MODE);
             bool useUlt = ultActive || mEqUltMode.dirty();
             bool eqDirty = mEqPresetId.dirty() || mEqConfig.dirty() || mEqClearBass.dirty();
-
-            if (useUlt && ultSupported && (eqDirty || mEqUltMode.dirty()))
+            if (ultSupported && (eqDirty || mEqUltMode.dirty()))
             {
                 EqEbbParamEqAndUltMode res;
                 res.base.command = Command::EQEBB_SET_PARAM;
@@ -564,13 +563,20 @@ namespace mdr
                     else if (eqBands == 10)
                         fillBands(6, mEqConfig.desired, false);
                 }
+                bool wasBandsDirty = mEqConfig.dirty() || mEqClearBass.dirty();
                 SendCommandACK(EqEbbParamEqAndUltMode, res);
                 mEqPresetId.commit(); mEqUltMode.commit(); mEqConfig.commit(); mEqClearBass.commit();
                 SendCommandACK(EqEbbGetParam);
+                if (!wasBandsDirty && ultSupported && !mEqConfig.current.empty())
+                {
+                    SendCommandACK(EqEbbGetParam, {.base = {
+                        .command = Command::EQEBB_GET_PARAM,
+                        .type = EqEbbInquiredType::PRESET_EQ_AND_ULT_MODE
+                    }});
+                }
             }
             else if (eqDirty)
             {
-                // Combine preset + band changes into ONE command (Sony app does this)
                 bool presetChanged = mEqPresetId.dirty();
                 bool bandsChanged = mEqConfig.dirty() || mEqClearBass.dirty();
                 if (presetChanged || bandsChanged)
@@ -581,39 +587,21 @@ namespace mdr
                     res.presetId = presetChanged ? mEqPresetId.desired : mEqPresetId.current;
                     if (bandsChanged)
                     {
-                        int eqBands = (int)mEqConfig.desired.size();
-                        if (eqBands == 5)
-                        {
-                            res.bands.value = Vector<UInt8>{{
-                                static_cast<UInt8>(mEqClearBass.desired + 10),
-                                static_cast<UInt8>(mEqConfig.desired[0] + 10),
-                                static_cast<UInt8>(mEqConfig.desired[1] + 10),
-                                static_cast<UInt8>(mEqConfig.desired[2] + 10),
-                                static_cast<UInt8>(mEqConfig.desired[3] + 10),
-                                static_cast<UInt8>(mEqConfig.desired[4] + 10),
-                            }};
-                        }
-                        else if (eqBands == 10)
-                        {
-                            auto& bands = mEqConfig.desired;
-                            res.bands.value = Vector<UInt8>{{
-                                static_cast<UInt8>(bands[0] + 6),
-                                static_cast<UInt8>(bands[1] + 6),
-                                static_cast<UInt8>(bands[2] + 6),
-                                static_cast<UInt8>(bands[3] + 6),
-                                static_cast<UInt8>(bands[4] + 6),
-                                static_cast<UInt8>(bands[5] + 6),
-                                static_cast<UInt8>(bands[6] + 6),
-                                static_cast<UInt8>(bands[7] + 6),
-                                static_cast<UInt8>(bands[8] + 6),
-                                static_cast<UInt8>(bands[9] + 6),
-                            }};
-                        }
+                        // just commit locally - bands sent via ULT path above
                         mEqConfig.commit(); mEqClearBass.commit();
                     }
-                    mEqPresetId.commit();
-                    SendCommandACK(EqEbbParamEq, res);
+                    if (presetChanged)
+                    {
+                        mEqPresetId.commit();
+                        res.presetId = mEqPresetId.current;
+                        SendCommandACK(EqEbbParamEq, res);
+                    }
                     SendCommandACK(EqEbbGetParam);
+                    if (ultSupported)
+                        SendCommandACK(EqEbbGetParam, {.base = {
+                            .command = Command::EQEBB_GET_PARAM,
+                            .type = EqEbbInquiredType::PRESET_EQ_AND_ULT_MODE
+                        }});
                 }
             }
             // Handle ULT-only change (no EQ change)
