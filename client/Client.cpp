@@ -265,13 +265,17 @@ const char* FormatEnum(v2::t1::SoundEffectType se)
     case SOUND_EFFECT_OFF:
         return "Off";
     case SOUND_EFFECT_ULT:
-        return "ULT";
+        return "ULT POWER SOUND";
     case SOUND_EFFECT_ULT1:
-        return "ULT 1";
+        return "ULT1";
     case SOUND_EFFECT_ULT2:
-        return "ULT 2";
+        return "ULT2";
     case SOUND_EFFECT_CUSTOM:
         return "Custom";
+    case SOUND_EFFECT_FLAT:
+        return "Flat";
+    case SOUND_EFFECT_LIVE:
+        return "Live";
     default:
         return "Unknown";
     }
@@ -285,9 +289,9 @@ const char* FormatEnum(v2::t1::EqUltMode mode)
     case OFF:
         return "Off";
     case ULT_1:
-        return "ULT 1";
+        return "ULT1";
     case ULT_2:
-        return "ULT 2";
+        return "ULT2";
     default:
         return "Unknown";
     }
@@ -474,7 +478,7 @@ void ImComboBoxItems(const char* label, Span<const T> items, T& selection)
     }
 }
 
-void ImEqualizer(Span<int> bands)
+static void DrawEqualizer(Span<int> bands)
 {
     constexpr const char* kBand5[] = {"400", "1k", "2.5k", "6.3k", "16k"};
     constexpr const char* kBand10[] = {"31", "63", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"};
@@ -486,21 +490,34 @@ void ImEqualizer(Span<int> bands)
     if (numBands == 5)
         kBands = kBand5, mn = -10, mx = 10;
     if (!kBands)
-        return ImGui::Text("EQ Unavailable (bands=%d)", numBands);
+    {
+        ImGui::Text("No EQ band data available");
+        return;
+    }
+
     auto& style = ImGui::GetStyle();
     float padding = style.FramePadding.x;
+    float bandWidth = (ImGui::GetContentRegionAvail().x - padding * (numBands - 1)) / numBands;
+    float bandHeight = 140.0f;
+
+    // Background rect for visual reference
     auto [offset, region, draw] = ImWindowDrawOffsetRegionList();
-    float bandWidth = region.x / numBands - padding;
-    float bandHeight = std::max(region.y, 160.0f);
-    if (numBands == 5)
-        ImGui::SeparatorText("5-Band EQ");
-    if (numBands == 10)
-        ImGui::SeparatorText("10-Band EQ");
+    ImVec2 bg_tl = offset;
+    ImVec2 bg_br = {offset.x + bandWidth * numBands + padding * (numBands - 1), offset.y + bandHeight};
+    int bgCol = MaterialYouTheme::ArgbToImU32(MaterialYouTheme::FixedSurfaceColors::surfaceContainerHighest, 0.5f);
+    draw->AddRectFilled(bg_tl, bg_br, bgCol, 4.0f);
+
+    // Center line at 0dB
+    int centerCol = MaterialYouTheme::ArgbToImU32(MaterialYouTheme::FixedSurfaceColors::outline, 0.5f);
+    float centerY = offset.y + bandHeight * 0.5f;
+    draw->AddLine({offset.x, centerY}, {offset.x + bandWidth * numBands + padding * (numBands - 1), centerY}, centerCol, 1.0f);
+
     for (int i = 0; i < numBands; ++i)
     {
         ImGui::BeginGroup();
         ImGui::PushID(i);
-        ImGui::VSliderInt("##v", ImVec2{bandWidth, bandHeight}, &bands[i], mn, mx);
+        ImVec2 sliderSize = {bandWidth, bandHeight};
+        ImGui::VSliderInt("##v", sliderSize, &bands[i], mn, mx);
         ImGui::PopID();
 
         float textWidth = ImGui::CalcTextSize(kBands[i]).x;
@@ -1092,12 +1109,27 @@ void DrawDeviceControlsSound()
             CUSTOM, USER_SETTING1, USER_SETTING2, USER_SETTING3, USER_SETTING4, USER_SETTING5
         };
         ImComboBoxItems<v2::t1::EqPresetId>("Preset", kSelections, gDevice.mEqPresetId.desired);
-        ImEqualizer(gDevice.mEqConfig.desired);
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Apply to##eq"))
+        {
+            // Request EQ param refresh from device
+            gDevice.Invoke(gDevice.RequestSyncV2());
+        }
+        ImGui::Separator();
+        DrawEqualizer(gDevice.mEqConfig.desired);
         if (gDevice.mEqConfig.desired.size() == 5)
         {
             ImGui::SeparatorText("Clear Bass");
             ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-            ImGui::SliderInt("##", &gDevice.mEqClearBass.desired, -10, 10);
+            ImGui::SliderInt("##cb", &gDevice.mEqClearBass.desired, -10, 10);
+        }
+        // Show current bands inline
+        ImGui::Text("Bands: ");
+        ImGui::SameLine();
+        for (size_t i = 0; i < gDevice.mEqConfig.current.size(); i++)
+        {
+            ImGui::Text("%+d", gDevice.mEqConfig.current[i]);
+            if (i < gDevice.mEqConfig.current.size() - 1) ImGui::SameLine();
         }
         ImGui::SeparatorText("DSEE");
         ImGui::BeginDisabled(!gDevice.mUpscalingAvailable);
@@ -1116,8 +1148,28 @@ void DrawDeviceControlsSound()
                 SoundEffectType::SOUND_EFFECT_ULT1,
                 SoundEffectType::SOUND_EFFECT_ULT2,
                 SoundEffectType::SOUND_EFFECT_CUSTOM,
+                SoundEffectType::SOUND_EFFECT_FLAT,
+                SoundEffectType::SOUND_EFFECT_LIVE,
             };
             ImComboBoxItems<SoundEffectType>("Type", kSe, gDevice.mSoundEffect.desired);
+            // Official Sony descriptions
+            switch (gDevice.mSoundEffect.desired)
+            {
+            case SoundEffectType::SOUND_EFFECT_ULT:
+                ImGui::TextWrapped("Enhances the low-pass range.");
+                break;
+            case SoundEffectType::SOUND_EFFECT_ULT1:
+                ImGui::TextWrapped("Enhances the deeper low-pass range.");
+                break;
+            case SoundEffectType::SOUND_EFFECT_ULT2:
+                ImGui::TextWrapped("Increased sense of power.");
+                break;
+            case SoundEffectType::SOUND_EFFECT_CUSTOM:
+                ImGui::TextWrapped("Set your preferred equalizer settings.");
+                break;
+            default:
+                break;
+            }
         }
         if (kSupports(F1::PRESET_EQ_AND_ULT_MODE))
         {
@@ -1129,6 +1181,17 @@ void DrawDeviceControlsSound()
                 EqUltMode::ULT_2,
             };
             ImComboBoxItems<EqUltMode>("Mode", kU, gDevice.mEqUltMode.desired);
+            switch (gDevice.mEqUltMode.desired)
+            {
+            case EqUltMode::ULT_1:
+                ImGui::TextWrapped("ULT1 works with any EQ preset to enhance deep bass.");
+                break;
+            case EqUltMode::ULT_2:
+                ImGui::TextWrapped("ULT2 delivers maximum bass impact on any EQ preset.");
+                break;
+            default:
+                break;
+            }
         }
         ImGui::TreePop();
     }

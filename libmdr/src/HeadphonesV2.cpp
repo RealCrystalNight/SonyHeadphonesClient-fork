@@ -528,69 +528,119 @@ namespace mdr
             }
         }
 
-        /* EQ */
-        if (mEqPresetId.dirty())
+        /* EQ + ULT Mode (coupled: when ULT is active, send together) */
         {
             using namespace t1;
-            EqEbbParamEq res;
-            res.base.command = Command::EQEBB_SET_PARAM;
-            res.base.type = EqEbbInquiredType::PRESET_EQ;
-            res.presetId = mEqPresetId.desired;
-            SendCommandACK(EqEbbParamEq, res);
-            mEqPresetId.commit();
-            // Ask for a equalizer param update afterwards
-            SendCommandACK(EqEbbGetParam);
-        }
-        if (mEqConfig.dirty() || mEqClearBass.dirty())
-        {
-            using namespace t1;
-            EqEbbParamEq res;
-            res.base.command = Command::EQEBB_SET_PARAM;
-            res.base.type = EqEbbInquiredType::PRESET_EQ;
-            res.presetId = mEqPresetId.current;
-            int eqBands = mEqConfig.desired.size(), eqOffset = 0;
-            if (eqBands == 0)
+            bool ultActive = mEqUltMode.desired != EqUltMode::OFF;
+            bool ultSupported = mSupport.contains(MessageMdrV2FunctionType_Table1::PRESET_EQ_AND_ULT_MODE);
+            bool useUlt = ultActive || mEqUltMode.dirty();
+            bool eqDirty = mEqPresetId.dirty() || mEqConfig.dirty() || mEqClearBass.dirty();
+
+            if (useUlt && ultSupported && (eqDirty || mEqUltMode.dirty()))
             {
-                mEqConfig.commit(), mEqClearBass.commit();
-            }
-            else
-            {
-                auto& bands = mEqConfig.desired;
-                if (eqBands == 5)
+                EqEbbParamEqAndUltMode res;
+                res.base.command = Command::EQEBB_SET_PARAM;
+                res.base.type = EqEbbInquiredType::PRESET_EQ_AND_ULT_MODE;
+                res.presetId = mEqPresetId.desired;
+                res.eqUltModeStatus = mEqUltMode.desired;
+                // Include band values if config changed
+                int eqBands = (int)mEqConfig.desired.size();
+                if (eqBands > 0 && (mEqConfig.dirty() || mEqClearBass.dirty()))
                 {
-                    res.bands.value = Vector<UInt8>{{
-                        static_cast<UInt8>(mEqClearBass.desired + 10),
-                        static_cast<UInt8>(bands[0] + 10),
-                        static_cast<UInt8>(bands[1] + 10),
-                        static_cast<UInt8>(bands[2] + 10),
-                        static_cast<UInt8>(bands[3] + 10),
-                        static_cast<UInt8>(bands[4] + 10),
-                    }};
+                    auto fillBands = [&](int offset, auto& dst) {
+                        res.bandSteps.value.resize(dst.size() + (mEqClearBass.dirty() ? 1 : 0));
+                        size_t idx = 0;
+                        if (mEqClearBass.dirty())
+                            res.bandSteps.value[idx++] = static_cast<UInt8>(mEqClearBass.desired + 10);
+                        for (auto b : dst)
+                            res.bandSteps.value[idx++] = static_cast<UInt8>(b + offset);
+                    };
+                    if (eqBands == 5)
+                    {
+                        std::array<int, 5> dst{mEqConfig.desired[0], mEqConfig.desired[1],
+                            mEqConfig.desired[2], mEqConfig.desired[3], mEqConfig.desired[4]};
+                        fillBands(10, dst);
+                    }
+                    else if (eqBands == 10)
+                        fillBands(6, mEqConfig.desired);
                 }
-                else if (eqBands == 10)
-                    res.bands.value = Vector<UInt8>{{
-                        static_cast<UInt8>(bands[0] + 6),
-                        static_cast<UInt8>(bands[1] + 6),
-                        static_cast<UInt8>(bands[2] + 6),
-                        static_cast<UInt8>(bands[3] + 6),
-                        static_cast<UInt8>(bands[4] + 6),
-                        static_cast<UInt8>(bands[5] + 6),
-                        static_cast<UInt8>(bands[6] + 6),
-                        static_cast<UInt8>(bands[7] + 6),
-                        static_cast<UInt8>(bands[8] + 6),
-                        static_cast<UInt8>(bands[9] + 6),
-                    }};
-                else
-                    MDR_CHECK_MSG(false, "mEqConfig size can only be 0, 5, or 10. Got {}.", eqBands);
-                mEqConfig.commit();
-                mEqClearBass.commit();
-                SendCommandACK(EqEbbParamEq, res);
-                // Ask for a equalizer param update afterwards
+                SendCommandACK(EqEbbParamEqAndUltMode, res);
+                mEqPresetId.commit(); mEqUltMode.commit(); mEqConfig.commit(); mEqClearBass.commit();
                 SendCommandACK(EqEbbGetParam);
+            }
+            else if (eqDirty)
+            {
+                // Send plain PRESET_EQ when ULT is off and not changing
+                if (mEqPresetId.dirty())
+                {
+                    EqEbbParamEq res;
+                    res.base.command = Command::EQEBB_SET_PARAM;
+                    res.base.type = EqEbbInquiredType::PRESET_EQ;
+                    res.presetId = mEqPresetId.desired;
+                    SendCommandACK(EqEbbParamEq, res);
+                    mEqPresetId.commit();
+                    SendCommandACK(EqEbbGetParam);
+                }
+                if (mEqConfig.dirty() || mEqClearBass.dirty())
+                {
+                    EqEbbParamEq res;
+                    res.base.command = Command::EQEBB_SET_PARAM;
+                    res.base.type = EqEbbInquiredType::PRESET_EQ;
+                    res.presetId = mEqPresetId.current;
+                    int eqBands = (int)mEqConfig.desired.size();
+                    if (eqBands == 0)
+                    {
+                        mEqConfig.commit(); mEqClearBass.commit();
+                    }
+                    else
+                    {
+                        auto& bands = mEqConfig.desired;
+                        if (eqBands == 5)
+                        {
+                            res.bands.value = Vector<UInt8>{{
+                                static_cast<UInt8>(mEqClearBass.desired + 10),
+                                static_cast<UInt8>(bands[0] + 10),
+                                static_cast<UInt8>(bands[1] + 10),
+                                static_cast<UInt8>(bands[2] + 10),
+                                static_cast<UInt8>(bands[3] + 10),
+                                static_cast<UInt8>(bands[4] + 10),
+                            }};
+                        }
+                        else if (eqBands == 10)
+                            res.bands.value = Vector<UInt8>{{
+                                static_cast<UInt8>(bands[0] + 6),
+                                static_cast<UInt8>(bands[1] + 6),
+                                static_cast<UInt8>(bands[2] + 6),
+                                static_cast<UInt8>(bands[3] + 6),
+                                static_cast<UInt8>(bands[4] + 6),
+                                static_cast<UInt8>(bands[5] + 6),
+                                static_cast<UInt8>(bands[6] + 6),
+                                static_cast<UInt8>(bands[7] + 6),
+                                static_cast<UInt8>(bands[8] + 6),
+                                static_cast<UInt8>(bands[9] + 6),
+                            }};
+                        else
+                            MDR_CHECK_MSG(false, "mEqConfig size can only be 0, 5, or 10. Got {}.", eqBands);
+                        mEqConfig.commit(); mEqClearBass.commit();
+                        SendCommandACK(EqEbbParamEq, res);
+                        SendCommandACK(EqEbbGetParam);
+                    }
+                }
+            }
+            // Handle ULT-only change (no EQ change)
+            if (mEqUltMode.dirty() && !eqDirty)
+            {
+                EqEbbParamEqAndUltMode res;
+                res.base.command = Command::EQEBB_SET_PARAM;
+                res.base.type = EqEbbInquiredType::PRESET_EQ_AND_ULT_MODE;
+                res.presetId = mEqPresetId.current;
+                res.eqUltModeStatus = mEqUltMode.desired;
+                SendCommandACK(EqEbbParamEqAndUltMode, res);
+                mEqUltMode.commit();
             }
         }
 
-        /* Sound Effect / ULT Mode */
+        /* Sound Effect */
         if (mSupport.contains(MessageMdrV2FunctionType_Table1::SOUND_EFFECT))
         {
             if (mSoundEffect.dirty())
@@ -602,20 +652,6 @@ namespace mdr
                 res.soundEffectValue = mSoundEffect.desired;
                 SendCommandACK(EqEbbParamSoundEffect, res);
                 mSoundEffect.commit();
-            }
-        }
-        if (mSupport.contains(MessageMdrV2FunctionType_Table1::PRESET_EQ_AND_ULT_MODE))
-        {
-            if (mEqUltMode.dirty())
-            {
-                using namespace t1;
-                EqEbbParamEqAndUltMode res;
-                res.base.command = Command::EQEBB_SET_PARAM;
-                res.base.type = EqEbbInquiredType::PRESET_EQ_AND_ULT_MODE;
-                res.presetId = mEqPresetId.current;
-                res.eqUltModeStatus = mEqUltMode.desired;
-                SendCommandACK(EqEbbParamEqAndUltMode, res);
-                mEqUltMode.commit();
             }
         }
 
