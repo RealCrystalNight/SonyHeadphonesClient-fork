@@ -600,6 +600,7 @@ void ExceptionHandler(auto&& func)
     }
     catch (const std::runtime_error& exc)
     {
+        fprintf(stderr, "\nERROR: %s\n\n", exc.what());
         gBugcheckMessage = exc.what();
         appState = APP_STATE_BUGCHECK;
     }
@@ -891,6 +892,10 @@ void DrawDeviceControlsHeader()
         /* Now Playing */
         {
             ImGui::Text(PSI_VOLUME_UP " Now Playing");
+            if (gDevice.mPlayTrackTitle.empty())
+            {
+                ImGui::TextWrapped("Tip: run 'mpris-proxy &' to show tracks");
+            }
             if (ImGui::BeginTable("##NowPlaying", 2, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_BordersInnerH))
             {
                 ImGui::TableNextRow();
@@ -1109,14 +1114,9 @@ void DrawDeviceControlsSound()
             CUSTOM, USER_SETTING1, USER_SETTING2, USER_SETTING3, USER_SETTING4, USER_SETTING5
         };
         ImComboBoxItems<v2::t1::EqPresetId>("Preset", kSelections, gDevice.mEqPresetId.desired);
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Apply to##eq"))
-        {
-            // Request EQ param refresh from device
-            gDevice.Invoke(gDevice.RequestSyncV2());
-        }
         ImGui::Separator();
         DrawEqualizer(gDevice.mEqConfig.desired);
+        bool eqChanged = gDevice.mEqConfig.dirty() || gDevice.mEqClearBass.dirty();
         if (gDevice.mEqConfig.desired.size() == 5)
         {
             ImGui::SeparatorText("Clear Bass");
@@ -1542,15 +1542,32 @@ void DrawDeviceControls()
         case MDR_HEADPHONES_TASK_INIT_OK:
             // Load model image database
             gModelDB.load(std::string(CLIENT_RESOURCES_DIR) + "/model_images.json");
+            // Auto-start mpris-proxy for Now Playing metadata
+            system("systemctl --user start mpris-proxy 2>/dev/null");
             // Request for a stat update ASAP
             // User may request for this themselves - we don't do periodic checks this time
             MDR_CHECK(gDevice.Invoke(gDevice.RequestSyncV2()) == MDR_RESULT_OK);
             return;
         case MDR_HEADPHONES_IDLE:
+        {
             // Commit changes if needed to
             if (gDevice.IsDirty())
-                MDR_CHECK(gDevice.Invoke(gDevice.RequestCommitV2()) == MDR_RESULT_OK);
+            {
+                int r = gDevice.Invoke(gDevice.RequestCommitV2());
+                if (r != MDR_RESULT_OK && r != MDR_RESULT_INPROGRESS)
+                    fprintf(stderr, "Idle commit error: %d\n", r);
+            }
+            // Periodic playback metadata poll (~5s)
+            static Uint32 lastPlaybackPoll = 0;
+            Uint32 now = SDL_GetTicks();
+            if (now - lastPlaybackPoll > 5000)
+            {
+                lastPlaybackPoll = now;
+                if (!gDevice.IsDirty()) // skip if commit pending
+                    gDevice.Invoke(gDevice.RequestRefreshPlaybackV2());
+            }
             return;
+        }
         case MDR_HEADPHONES_ERROR:
             // Irrecoverable. Disconnect now.
             mdrConnectionDisconnect(conn);

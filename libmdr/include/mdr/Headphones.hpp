@@ -382,6 +382,16 @@ namespace mdr
          * @return @ref MDR_HEADPHONES_TASK_COMMIT_OK on completion (returned in @ref PollEvents)
          */
         MDRTask RequestCommitV2();
+        /**
+         * @brief Refresh EQ parameters from the device
+         * @note  To be used with @ref Invoke.
+         */
+        MDRTask RequestRefreshEQV2();
+        /**
+         * @brief Request playback metadata update from the device
+         * @note  To be used with @ref Invoke.
+         */
+        MDRTask RequestRefreshPlaybackV2();
 #pragma endregion
 
     private:

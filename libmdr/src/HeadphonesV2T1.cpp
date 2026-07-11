@@ -284,9 +284,13 @@ namespace mdr
         {
             PlayParamPlaybackControllerName res;
             PlayParamPlaybackControllerName::Deserialize(cmd.data(), res, cmd.size());
-            self->mPlayTrackTitle = res.playbackNames.value[0].playbackName.value;
-            self->mPlayTrackAlbum = res.playbackNames.value[1].playbackName.value;
-            self->mPlayTrackArtist = res.playbackNames.value[2].playbackName.value;
+            // Only update with non-empty values to avoid blanking display
+            if (!res.playbackNames.value[0].playbackName.value.empty())
+                self->mPlayTrackTitle = res.playbackNames.value[0].playbackName.value;
+            if (!res.playbackNames.value[1].playbackName.value.empty())
+                self->mPlayTrackAlbum = res.playbackNames.value[1].playbackName.value;
+            if (!res.playbackNames.value[2].playbackName.value.empty())
+                self->mPlayTrackArtist = res.playbackNames.value[2].playbackName.value;
             return MDR_HEADPHONES_EVT_PLAYBACK_METADATA;
         }
         case MUSIC_VOLUME:
@@ -665,6 +669,7 @@ namespace mdr
             switch (res.bands.size())
             {
             case 0:
+                // Keep existing bands if device returns none
                 return MDR_HEADPHONES_EVT_EQUALIZER_PARAM;
             case 6:
                 self->mEqClearBass.overwrite(res.bands.value[0] - 10);
@@ -703,6 +708,27 @@ namespace mdr
                 EqEbbParamEqAndUltMode::Deserialize(cmd.data(), res, cmd.size());
                 self->mEqPresetId.overwrite(res.presetId);
                 self->mEqUltMode.overwrite(res.eqUltModeStatus);
+                // Extract band steps
+                auto bv = res.bandSteps.value;
+                if (bv.size() == 6) // Clear Bass + 5 bands
+                {
+                    self->mEqClearBass.overwrite(static_cast<int>(bv[0]) - 10);
+                    self->mEqConfig.overwrite(Vector<int>{
+                        static_cast<int>(bv[1]) - 10,
+                        static_cast<int>(bv[2]) - 10,
+                        static_cast<int>(bv[3]) - 10,
+                        static_cast<int>(bv[4]) - 10,
+                        static_cast<int>(bv[5]) - 10,
+                    });
+                }
+                else if (bv.size() == 10) // 10 bands
+                {
+                    self->mEqClearBass.overwrite(0);
+                    Vector<int> bands;
+                    for (auto v : bv)
+                        bands.push_back(static_cast<int>(v) - 6);
+                    self->mEqConfig.overwrite(bands);
+                }
                 return MDR_HEADPHONES_EVT_EQUALIZER_PARAM;
             }
             return MDR_HEADPHONES_EVT_UNHANDLED;

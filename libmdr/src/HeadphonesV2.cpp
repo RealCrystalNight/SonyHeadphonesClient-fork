@@ -547,10 +547,10 @@ namespace mdr
                 int eqBands = (int)mEqConfig.desired.size();
                 if (eqBands > 0 && (mEqConfig.dirty() || mEqClearBass.dirty()))
                 {
-                    auto fillBands = [&](int offset, auto& dst) {
-                        res.bandSteps.value.resize(dst.size() + (mEqClearBass.dirty() ? 1 : 0));
+                    auto fillBands = [&](int offset, auto& dst, bool hasClearBass) {
+                        res.bandSteps.value.resize(dst.size() + (hasClearBass ? 1 : 0));
                         size_t idx = 0;
-                        if (mEqClearBass.dirty())
+                        if (hasClearBass)
                             res.bandSteps.value[idx++] = static_cast<UInt8>(mEqClearBass.desired + 10);
                         for (auto b : dst)
                             res.bandSteps.value[idx++] = static_cast<UInt8>(b + offset);
@@ -559,10 +559,10 @@ namespace mdr
                     {
                         std::array<int, 5> dst{mEqConfig.desired[0], mEqConfig.desired[1],
                             mEqConfig.desired[2], mEqConfig.desired[3], mEqConfig.desired[4]};
-                        fillBands(10, dst);
+                        fillBands(10, dst, true); // 5-band always includes Clear Bass
                     }
                     else if (eqBands == 10)
-                        fillBands(6, mEqConfig.desired);
+                        fillBands(6, mEqConfig.desired, false);
                 }
                 SendCommandACK(EqEbbParamEqAndUltMode, res);
                 mEqPresetId.commit(); mEqUltMode.commit(); mEqConfig.commit(); mEqClearBass.commit();
@@ -570,43 +570,32 @@ namespace mdr
             }
             else if (eqDirty)
             {
-                // Send plain PRESET_EQ when ULT is off and not changing
-                if (mEqPresetId.dirty())
+                // Combine preset + band changes into ONE command (Sony app does this)
+                bool presetChanged = mEqPresetId.dirty();
+                bool bandsChanged = mEqConfig.dirty() || mEqClearBass.dirty();
+                if (presetChanged || bandsChanged)
                 {
                     EqEbbParamEq res;
                     res.base.command = Command::EQEBB_SET_PARAM;
                     res.base.type = EqEbbInquiredType::PRESET_EQ;
-                    res.presetId = mEqPresetId.desired;
-                    SendCommandACK(EqEbbParamEq, res);
-                    mEqPresetId.commit();
-                    SendCommandACK(EqEbbGetParam);
-                }
-                if (mEqConfig.dirty() || mEqClearBass.dirty())
-                {
-                    EqEbbParamEq res;
-                    res.base.command = Command::EQEBB_SET_PARAM;
-                    res.base.type = EqEbbInquiredType::PRESET_EQ;
-                    res.presetId = mEqPresetId.current;
-                    int eqBands = (int)mEqConfig.desired.size();
-                    if (eqBands == 0)
+                    res.presetId = presetChanged ? mEqPresetId.desired : mEqPresetId.current;
+                    if (bandsChanged)
                     {
-                        mEqConfig.commit(); mEqClearBass.commit();
-                    }
-                    else
-                    {
-                        auto& bands = mEqConfig.desired;
+                        int eqBands = (int)mEqConfig.desired.size();
                         if (eqBands == 5)
                         {
                             res.bands.value = Vector<UInt8>{{
                                 static_cast<UInt8>(mEqClearBass.desired + 10),
-                                static_cast<UInt8>(bands[0] + 10),
-                                static_cast<UInt8>(bands[1] + 10),
-                                static_cast<UInt8>(bands[2] + 10),
-                                static_cast<UInt8>(bands[3] + 10),
-                                static_cast<UInt8>(bands[4] + 10),
+                                static_cast<UInt8>(mEqConfig.desired[0] + 10),
+                                static_cast<UInt8>(mEqConfig.desired[1] + 10),
+                                static_cast<UInt8>(mEqConfig.desired[2] + 10),
+                                static_cast<UInt8>(mEqConfig.desired[3] + 10),
+                                static_cast<UInt8>(mEqConfig.desired[4] + 10),
                             }};
                         }
                         else if (eqBands == 10)
+                        {
+                            auto& bands = mEqConfig.desired;
                             res.bands.value = Vector<UInt8>{{
                                 static_cast<UInt8>(bands[0] + 6),
                                 static_cast<UInt8>(bands[1] + 6),
@@ -619,12 +608,12 @@ namespace mdr
                                 static_cast<UInt8>(bands[8] + 6),
                                 static_cast<UInt8>(bands[9] + 6),
                             }};
-                        else
-                            MDR_CHECK_MSG(false, "mEqConfig size can only be 0, 5, or 10. Got {}.", eqBands);
+                        }
                         mEqConfig.commit(); mEqClearBass.commit();
-                        SendCommandACK(EqEbbParamEq, res);
-                        SendCommandACK(EqEbbGetParam);
                     }
+                    mEqPresetId.commit();
+                    SendCommandACK(EqEbbParamEq, res);
+                    SendCommandACK(EqEbbGetParam);
                 }
             }
             // Handle ULT-only change (no EQ change)
@@ -895,6 +884,34 @@ namespace mdr
             }
         }
         co_return MDR_HEADPHONES_TASK_COMMIT_OK;
+    }
+
+    MDRTask MDRHeadphones::RequestRefreshEQV2()
+    {
+        using namespace t1;
+        SendCommandACK(EqEbbGetParam);
+        if (mSupport.contains(MessageMdrV2FunctionType_Table1::PRESET_EQ_AND_ULT_MODE))
+            SendCommandACK(EqEbbGetParam, {.base = {
+                .command = Command::EQEBB_GET_PARAM,
+                .type = EqEbbInquiredType::PRESET_EQ_AND_ULT_MODE
+            }});
+        if (mSupport.contains(MessageMdrV2FunctionType_Table1::SOUND_EFFECT))
+            SendCommandACK(EqEbbGetParam, {.base = {
+                .command = Command::EQEBB_GET_PARAM,
+                .type = EqEbbInquiredType::SOUND_EFFECT
+            }});
+        co_return MDR_HEADPHONES_TASK_SYNC_OK;
+    }
+
+    MDRTask MDRHeadphones::RequestRefreshPlaybackV2()
+    {
+        using namespace t1;
+        SendCommandACK(GetPlayParam,
+                       {.type = PlayInquiredType::PLAYBACK_CONTROL_WITH_CALL_VOLUME_ADJUSTMENT});
+        SendCommandACK(GetPlayParam, {.type = PlayInquiredType::MUSIC_VOLUME});
+        SendCommandACK(GetPlayStatus,
+                       {.type = PlayInquiredType::PLAYBACK_CONTROL_WITH_CALL_VOLUME_ADJUSTMENT});
+        co_return MDR_HEADPHONES_TASK_SYNC_OK;
     }
 #pragma endregion
 }
