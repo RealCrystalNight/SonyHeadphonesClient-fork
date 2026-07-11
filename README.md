@@ -4,7 +4,7 @@ SonyHeadphonesClient
 A spiritual successor to  [Plutoberth's original SonyHeadphonesClient](https://github.com/Plutoberth/SonyHeadphonesClient) - now with standardized support for newer devices and more platforms. (Forked from https://github.com/mos9527/SonyHeadphonesClient)
 
 
-<img width="1066" height="942" alt="Screenshot_20260711_180848" src="https://github.com/user-attachments/assets/48959bb0-2e68-4192-adaf-d4957fc3fc20" />
+<img width="1286" height="1120" alt="Screenshot_20260711_200333" src="https://github.com/user-attachments/assets/888830e6-2f7a-41a9-a44d-f97cc0d21154" />
 
 
 ## Roadmap
